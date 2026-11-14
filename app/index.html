@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>宽基ETF量价跟踪器</title>
+<style>
+:root{
+  --bg:#f6f7f9; --card:#fff; --ink:#101418; --ink2:#5a6472; --ink3:#98a1ad;
+  --line:#e7eaee; --line2:#f0f2f5;
+  --up:#d9363e; --down:#12805c; --hot:#e8590c; --blue:#3b5bdb;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-size:14px;line-height:1.6;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+.wrap{max-width:1240px;margin:0 auto;padding:26px 20px 60px}
+
+/* 顶部 */
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+.brand h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.5px}
+.brand .sub{margin-top:5px;font-size:12.5px;color:var(--ink2)}
+.status{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.badge{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;
+  border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;color:var(--ink2)}
+.badge i{width:6px;height:6px;border-radius:50%;background:var(--ink3)}
+.badge.live{color:var(--blue);border-color:#c9d4f7}
+.badge.live i{background:var(--blue);box-shadow:0 0 0 3px #e2e8fc}
+.badge.warn{color:var(--hot);border-color:#fbd5c0}
+.badge.warn i{background:var(--hot)}
+button.ghost{background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 13px;
+  font-size:12.5px;color:var(--ink2);cursor:pointer;font-family:inherit}
+button.ghost:hover{border-color:#cfd6df;color:var(--ink)}
+label.toggle{font-size:12.5px;color:var(--ink2);display:inline-flex;align-items:center;gap:5px;cursor:pointer}
+.meta{width:100%;font-size:11.5px;color:var(--ink3);text-align:right}
+
+/* 结论卡 */
+.verdict{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 24px 18px;
+  position:relative;overflow:hidden;box-shadow:0 1px 2px rgba(16,20,24,.04)}
+.verdict:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--line)}
+.verdict.hot:before{background:var(--hot)}
+.verdict.mid:before{background:#e8a33c}
+.vtop{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.vlabel{font-size:11px;letter-spacing:1.4px;color:var(--ink3);font-weight:700}
+.vtitle{margin:8px 0 6px;font-size:29px;font-weight:800;letter-spacing:-.7px;line-height:1.15}
+.vtitle.cool{color:var(--ink2)}
+.vreason{font-size:13px;color:var(--ink2);max-width:780px}
+.vstamp{flex:none;text-align:center;border:1px dashed var(--line);border-radius:10px;padding:10px 14px;min-width:104px}
+.vstamp b{display:block;font-size:18px;font-weight:800}
+.vstamp span{font-size:10.5px;color:var(--ink3)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line2);
+  border:1px solid var(--line2);border-radius:9px;margin-top:18px;overflow:hidden}
+.grid>div{background:#fafbfc;padding:12px 14px}
+.grid .k{font-size:11px;color:var(--ink3);margin-bottom:5px}
+.grid .v{font-size:21px;font-weight:800;letter-spacing:-.4px}
+.grid .n{font-size:11px;color:var(--ink3);margin-top:2px}
+.bar{height:4px;background:var(--line2);border-radius:2px;margin-top:8px;overflow:hidden}
+.bar>span{display:block;height:100%;background:var(--hot);border-radius:2px;transition:width .35s}
+.hl{color:var(--hot)} .up{color:var(--up)} .down{color:var(--down)}
+.muted{color:var(--ink3)}
+
+/* 图表 */
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.chart{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;min-width:0}
+.chart h3{margin:0 0 2px;font-size:13px;font-weight:700}
+.chart .hint{margin:0 0 10px;font-size:11.5px;color:var(--ink3)}
+.chart svg{display:block;width:100%;height:auto}
+.empty{padding:26px 0;text-align:center;color:var(--ink3);font-size:12.5px;line-height:1.9}
+
+/* 表格 */
+.tablewrap{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-top:14px;overflow:auto}
+table{border-collapse:collapse;width:100%;min-width:1050px;font-size:13px}
+th{position:sticky;top:0;background:#fafbfc;z-index:2;text-align:left;font-weight:600;font-size:11.5px;
+  color:var(--ink2);padding:10px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th.r,td.r{text-align:right}
+td{padding:9px 10px;border-bottom:1px solid var(--line2);vertical-align:middle}
+tbody tr:hover{background:#fbfcfd}
+.name{font-weight:600}
+.chip{display:inline-block;margin-left:6px;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;
+  background:#eef1f5;color:var(--ink2);vertical-align:1px}
+.chip.core{background:#e8f0ff;color:var(--blue)}
+.code{font-size:11px;color:var(--ink3)}
+tr.grouphead td{background:#f7f9fb;font-size:11.5px;font-weight:700;color:var(--ink2);padding:7px 10px}
+tr.grouphead .cnt{float:right;font-weight:400;color:var(--ink3)}
+tr.total td{background:#fafbfc;font-weight:700;border-top:1px solid var(--line)}
+.sub{font-size:10.5px;color:var(--ink3);margin-top:1px}
+.mini{height:3px;background:var(--line2);border-radius:2px;margin-top:5px;overflow:hidden}
+.mini>span{display:block;height:100%;background:#c7d2e0}
+.mini>span.hi{background:var(--hot)}
+.spark{display:flex;align-items:flex-end;gap:1.5px;height:22px}
+.spark i{display:block;width:3px;background:#d5dce5;border-radius:1px}
+.spark i.last{background:var(--ink2)}
+
+/* 说明 */
+.notes{margin-top:16px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px 20px}
+details{border-top:1px solid var(--line2)}
+details:first-of-type{border-top:none}
+summary{cursor:pointer;padding:13px 0;font-size:13px;font-weight:600;color:var(--ink);list-style:none}
+summary::-webkit-details-marker{display:none}
+summary:before{content:"＋";color:var(--ink3);margin-right:7px;font-weight:400}
+details[open] summary:before{content:"－"}
+.notes p{margin:0 0 10px;font-size:12.5px;color:var(--ink2);line-height:1.75}
+.notes p:last-child{margin-bottom:14px}
+code{background:#f2f4f7;padding:1px 5px;border-radius:4px;font-size:11.5px;
+  font-family:ui-monospace,Consolas,monospace}
+.disc{margin-top:16px;padding:13px 16px;background:#fff8f0;border:1px solid #fbe0c8;border-radius:10px;
+  font-size:12px;color:#8a4b18;line-height:1.75}
+@media(max-width:860px){
+  .grid{grid-template-columns:repeat(2,1fr)}
+  .charts{grid-template-columns:1fr}
+  .vtitle{font-size:24px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <h1>宽基ETF量价跟踪器</h1>
+      <div class="sub">用公开行情推测「平准类资金」是否在场 · 20只核心池 + 4只对照</div>
+    </div>
+    <div class="status">
+      <span class="badge" id="badge"><i></i><span id="badgeText">初始化</span></span>
+      <button class="ghost" id="refresh">立即刷新</button>
+      <label class="toggle"><input type="checkbox" id="auto" checked>自动刷新</label>
+      <div class="meta" id="meta">—</div>
+    </div>
+  </header>
+
+  <section class="verdict" id="verdict">
+    <div class="vtop">
+      <div>
+        <div class="vlabel" id="vlabel">今日结论</div>
+        <div class="vtitle" id="vtitle">加载中…</div>
+        <div class="vreason" id="vreason">正在读取快照…</div>
+      </div>
+      <div class="vstamp">
+        <b class="num" id="vstampNum">—</b>
+        <span id="vstampLabel">较20日均额</span>
+      </div>
+    </div>
+    <div class="grid" id="mgrid"></div>
+  </section>
+
+  <section class="charts">
+    <div class="chart">
+      <h3>池内合计成交额 · 近30个交易日</h3>
+      <p class="hint">柱=当日合计成交额（亿元）；虚线=当前20日均额基准</p>
+      <div id="chart1"></div>
+    </div>
+    <div class="chart">
+      <h3>估算加仓指数</h3>
+      <p class="hint">首日=100，按池内总份额变化计算；&gt;100 为净申购</p>
+      <div id="chart2"></div>
+    </div>
+  </section>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th>ETF</th>
+        <th>跟踪指数</th>
+        <th class="r">规模(亿)</th>
+        <th class="r">成交额(亿)</th>
+        <th class="r" id="thRatio">较20日均</th>
+        <th class="r" title="(外盘-内盘)/(外盘+内盘)×成交额，逐笔方向推算">主动净买入①</th>
+        <th class="r">涨跌</th>
+        <th class="r" title="腾讯行情场内份额，T+1">份额(亿份)②</th>
+        <th>近30日</th>
+        <th class="r">汇金(25年报)</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="notes">
+    <details>
+      <summary>口径与算法（点开看细节）</summary>
+      <p><b>① 主动净买入</b> =（外盘 − 内盘）÷（外盘 + 内盘）× 成交额。外盘是成交在卖价的主动买、内盘是成交在买价的主动卖，所以这是<b>逐笔成交方向的推算</b>：不是资金净流入、不是申赎、不含大宗交易。ETF 有一二级套利对冲，同一笔申赎会在二级市场产生反向成交，会稀释该信号。</p>
+      <p><b>② 份额</b>来自腾讯行情的场内份额字段。<b>沪市是 T+1 的</b>：今天收盘跑脚本拿到的是昨天的份额，所以建议每天跑两次（09:45 后补昨日份额、收盘后跑量价）。相邻两日份额完全相同时页面不加数字，只标「份额源未日更」，避免把数据源滞后说成「没有申赎」。</p>
+      <p><b>20日均额</b>：用新浪 5 分钟 K 的 <code>amount</code> 字段按日求和（精确到元），不用「日K成交量 × 均价」的近似。基准窗口是快照交易日的<b>前</b>20 个完整交易日，不含当天。</p>
+      <p><b>日内同时点对齐</b>：这是盘中能不能读的关键。上午 10:30 的成交额只是半天，直接除全天均额得到的倍数毫无意义。本页用近 20 个交易日的日内分布算出「此刻历史平均已走完全天的百分比」，把分母按同一比例缩小后再比。收盘后进度=100%，退化为普通倍数。</p>
+      <p><b>尾盘占比</b>：14:35–15:00 成交额 / 全天，与 20 日均值对比。只在收盘后计算。护盘的典型形态是尾盘占比升高；若尾盘占比反而下降、放量集中在早盘，更像情绪驱动的抢筹。</p>
+      <p><b>加仓指数</b>：100 × 当日池内总份额 ÷ 首日总份额，只刻画方向与幅度，不做持仓比例锚定。</p>
+    </details>
+    <details>
+      <summary>为什么叫「推测」而不是「监测」</summary>
+      <p>ETF 定期报告自 2026-05-01 起不再强制披露前十大持有人（证监会 2026-03-13 修订的信息披露准则第2号），公开渠道已经无法验证任何机构当下持有哪只 ETF、持多少。本页用的名单是 2025 年报的历史标签，只能说明「历史上买过」，不代表现在还在。</p>
+      <p>份额变化是信披新规后少数仍公开可查的资金线索，但它反映的是「有人申购/赎回」，无法区分是汇金、保险、私募还是散户。所有结论都是量价推测，不能证明任何机构当日是否交易。</p>
+      <p>另外要说清楚：停止披露前十大持有人的政策意图之一，正是减少把平准资金进出当成「救市信号」的噪音交易。这个页面的方向与该意图相悖，只适合自己研究，不建议作为对客材料或投资建议发布。</p>
+    </details>
+    <details>
+      <summary>怎么保持最新</summary>
+      <p>收盘后（15:30 之后）在项目目录运行 <code>python update_data.py</code>，约 25 秒，重算 20 日均额、日内分布、尾盘占比，并累积当日份额。第二天早上 09:45 后再跑一次补昨日份额。抓取失败时会沿用上一份快照，不会把均额写成 0。</p>
+      <p>页面本身双击就能打开，不需要服务器。交易时段会自己向行情接口取实时数据，每 20 秒刷新一次；15:00 之后自动切回快照口径。</p>
+    </details>
+  </div>
+
+  <div class="disc" id="disc">
+    数据来自第三方公开接口，可能存在延迟、缺失或口径差异，请以基金公司公告与交易所披露为准。本页不构成投资建议，投资有风险。
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ============================ 配置 ============================
+  var CFG = {
+    hotRatio: 1.80,     // 强信号阈值
+    midRatio: 1.30,     // 弱信号阈值
+    liveRefreshMs: 20000,
+    idleRefreshMs: 60000
+  };
+
+  var S = null;          // 快照
+  var LIVE = {};         // 实时报价
+  var liveOK = false;
+  var liveDate = "";     // 实时数据所属日期 yyyymmdd
+  var refreshing = false;
+
+  // ============================ 时间状态 ============================
+  function bjNow(){
+    // 用 UTC+8 手工构造，避免依赖本机时区
+    var d = new Date();
+    var t = d.getTime() + (d.getTimezoneOffset() * 60000) + 8 * 3600000;
+    return new Date(t);
+  }
+  function pad(n){ return (n < 10 ? "0" : "") + n; }
+  function ymd(d){ return d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()); }
+  function hhmm(d){ return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+
+  function marketState(){
+    var d = bjNow(), w = d.getDay(), m = d.getHours()*60 + d.getMinutes();
+    var time = hhmm(d), date = ymd(d);
+    if (w === 0 || w === 6) {
+      return {open:false, trading:false, lunch:false, after:false, date:date, time:time, hhmm:time};
+    }
+    var trading = (m >= 570 && m < 690) || (m >= 780 && m < 900);
+    var lunch   = (m >= 690 && m < 780);
+    var after   = (m >= 900);
+    var preopen = (m >= 555 && m < 570);
+    return {open:true, trading:trading, lunch:lunch, after:after, preopen:preopen,
+            date:date, time:time, hhmm:time, minutes:m};
+  }
+
+  // ============================ 工具 ============================
+  function fmt(v, n){
+    if (v === null || v === undefined || isNaN(v)) return "—";
+    return Number(v).toFixed(n === undefined ? 1 : n);
+  }
+  function signed(v, n){
+    if (v === null || v === undefined || isNaN(v)) return "—";
+    var x = Number(v).toFixed(n === undefined ? 2 : n);
+    return (v > 0 ? "+" : "") + x;
+  }
+  function cls(v){ return v > 0 ? "up" : (v < 0 ? "down" : "muted"); }
+  function fmtDate(s){
+    if (!s || s.length !== 8) return s || "—";
+    var wk = ["周日","周一","周二","周三","周四","周五","周六"];
+    var d = new Date(+s.slice(0,4), +s.slice(4,6)-1, +s.slice(6,8));
+    return s.slice(0,4) + "-" + s.slice(4,6) + "-" + s.slice(6,8) + " " + wk[d.getDay()];
+  }
+
+  // ============================ 核心计算 ============================
+  // st: marketState；it: 单只ETF
+  // 返回 {amt, ratio, raw, done, net, pct, live}
+  function calc(it, st){
+    var amt = it.amount_yi, pct = it.pct, net = null, done = 1, isLive = false;
+    var lv = LIVE[it.code];
+    var stale = st.trading || st.after;
+
+    if (lv && lv.ts && lv.amount > 0) {
+      var ld = lv.ts.slice(0, 8);
+      if (ld > (it.date || "")) {
+        // 实时报价比快照新：进入实时口径，分母按同时点进度缩小
+        isLive = true;
+        liveDate = ld;
+        amt = lv.amount;
+        pct = lv.pct;
+        var oi = (lv.outer || 0) + (lv.inner || 0);
+        net = oi > 0 ? ((lv.outer - lv.inner) / oi) * amt : null;
+        done = progress(it.shape, st.hhmm);
+      } else if (ld === (it.date || "")) {
+        isLive = (st.trading || st.after);
+      }
+    }
+    if (net === null) {
+      var oi2 = (it.outer_lots || 0) + (it.inner_lots || 0);
+      // 外盘/内盘只在当日有效，隔日就抓不到了。抓不到时返回 null，
+      // 不能返回 0——那会被读成「买卖力量相等」，把结论往「方向不清」上带。
+      net = oi2 > 0 ? ((it.outer_lots - it.inner_lots) / oi2) * amt : null;
+    }
+    var base = (it.avg20_yi || 0) * done;
+    var ratio = base > 0 ? amt / base : 0;
+    var raw = it.avg20_yi > 0 ? amt / it.avg20_yi : 0;
+    return {amt:amt, ratio:ratio, raw:raw, done:done, net:net, pct:pct, isLive:isLive};
+  }
+
+  // 从日内分布里查「某个时刻历史平均走完全天的比例」
+  function progress(shape, t){
+    if (!shape || !shape.length) return 1;
+    var last = shape[shape.length-1][1];
+    for (var i = 0; i < shape.length; i++) {
+      if (shape[i][0] >= t) return shape[i][1] || last;
+    }
+    return last;
+  }
+
+  // ============================ 结论 ============================
+  function verdict(){
+    var st = marketState();
+    var core = S.items.filter(function(x){ return x.group === "core"; });
+    var amt = 0, base = 0, net = 0, netCnt = 0, liveCnt = 0;
+    var capW = 0, pctW = 0, tailC = 0, tailB = 0, tailA = 0, baseAll = 0;
+    core.forEach(function(it){
+      var c = calc(it, st);
+      amt += c.amt; base += (it.avg20_yi || 0) * c.done; baseAll += (it.avg20_yi || 0);
+      if (c.net === null) { /* 缺数据，不计入 */ } else { net += c.net; netCnt++; }
+      if (c.isLive) liveCnt++;
+      var w = it.mktcap_yi || 0;
+      capW += w; pctW += (c.pct || 0) * w;
+      if (it.tail_ratio != null && it.tail_ratio_base != null) {
+        tailC += it.amount_yi * it.tail_ratio;
+        tailB += it.amount_yi * it.tail_ratio_base;
+        tailA += it.amount_yi;
+      }
+    });
+    var ratio = base > 0 ? amt / base : 0;
+    var wpct = capW > 0 ? pctW / capW : 0;
+    var tail = tailA > 0 ? tailC / tailA : 0;
+    var tailBase = tailA > 0 ? tailB / tailA : 0;
+    var netKnown = netCnt > 0;
+    var netTxt = netKnown ? signed(net, 1) : "缺失";
+
+    var level = "cool", title = "", reason = "";
+
+    if (!netKnown) {
+      // 外盘/内盘没采到：只能谈量，不能谈方向。硬凑一个「方向不清」是误导
+      if (ratio >= CFG.midRatio) {
+        level = "mid"; title = "放量了，但看不出方向";
+        reason = "成交额达到同时点均值的 " + fmt(ratio,2) + " 倍，确实有明显的量能异动。"
+               + "但这一天的外盘/内盘没有采集到（该字段只在当天有效，必须在收盘后运行脚本），"
+               + "所以无法判断这些成交是主动买还是主动卖。";
+      } else {
+        level = "cool"; title = "量能平淡";
+        reason = "成交额只有同时点均值的 " + fmt(ratio,2) + " 倍，池内没有明显的量能异动。";
+      }
+    } else if (ratio >= CFG.hotRatio && net > 0) {
+      level = "hot"; title = "放量且偏买";
+      reason = "池内成交额达到同时点均值的 " + fmt(ratio,2) + " 倍，主动净买入 " + netTxt
+             + " 亿元。量价同向，是护盘最典型的量价组合——但只说明「有人大额买」，不等于买的是同一批钱。";
+    } else if (ratio >= CFG.midRatio && net > 0) {
+      level = "mid"; title = "有迹象，力度不够";
+      reason = "成交额放大到同时点均值的 " + fmt(ratio,2) + " 倍，主动净买入 " + netTxt
+             + " 亿元，方向偏买，但离强信号阈值还差一截。单日不足以定论，要看是否连续。";
+    } else if (ratio >= CFG.hotRatio && net <= 0) {
+      level = "mid"; title = "放量了，方向不对";
+      reason = "成交额达到同时点均值的 " + fmt(ratio,2) + " 倍，但主动净买入 " + netTxt
+             + " 亿元。大额成交未必是买盘，也可能是换手或出货，不能直接算护盘。";
+    } else if (ratio >= CFG.midRatio) {
+      level = "mid"; title = "活跃，但证据不足";
+      reason = "成交额达到同时点均值的 " + fmt(ratio,2) + " 倍，主动净买入 " + netTxt
+             + " 亿元，方向不清晰。";
+    } else {
+      level = "cool"; title = "看不出在场迹象";
+      reason = "成交额只有同时点均值的 " + fmt(ratio,2) + " 倍，主动净买入 " + netTxt
+             + " 亿元，量价都平静。";
+    }
+
+    if (tail > 0 && tailBase > 0 && tail > tailBase * 1.2 && level !== "cool") {
+      reason += " 尾盘半小时占全天成交 " + fmt(tail*100,1) + "%，高于20日均值 " + fmt(tailBase*100,1) + "%，符合尾盘托底特征。";
+    } else if (tail > 0 && tailBase > 0 && tail < tailBase * 0.8 && level !== "cool") {
+      reason += " 不过尾盘半小时只占全天 " + fmt(tail*100,1) + "%（均值 " + fmt(tailBase*100,1)
+              + "%），放量集中在盘中而非尾盘，更像情绪抢筹，不是收盘护盘。";
+    }
+    if (wpct < -0.5 && level !== "cool") {
+      reason += " 池内加权涨跌 " + fmt(wpct,2) + "%，下跌日放量，才更符合护盘场景。";
+    } else if (wpct > 1 && level !== "cool") {
+      reason += " 池内加权涨跌 +" + fmt(wpct,2) + "%，这是普涨日的放量，与「托底」是两种性质。";
+    }
+
+    var done = baseAll > 0 ? base / baseAll : 1;
+    var suff;
+    if (st.trading && liveCnt === 0) {
+      suff = "（实时通道未连上，显示 " + fmtDate(S.trade_date) + " 全天快照，按全天口径对比）";
+    } else if (st.trading || st.lunch) {
+      suff = "（" + st.hhmm + " 历史平均已走完全天 " + fmt(done*100,1) + "%，分母已同比例缩小）";
+    } else if (st.after) {
+      suff = "（已收盘，以上为 " + fmtDate(S.trade_date) + " 全天复盘）";
+    } else if (st.preopen) {
+      suff = "（等待开盘，显示上一交易日收盘数据）";
+    } else {
+      suff = "（休市，最近交易日 " + fmtDate(S.trade_date) + "）";
+    }
+
+    return {st: st, amt: amt, base: base, net: netKnown ? net : null, ratio: ratio,
+            wpct: wpct, tail: tail, tailBase: tailBase, level: level, title: title,
+            reason: reason + suff};
+  }
+
+  // ============================ 渲染：结论卡 ============================
+  function card(k, v, n, extra, vcls){
+    return '<div><div class="k">' + k + '</div><div class="v num ' + (vcls || '') + '">' + v + '</div>'
+         + '<div class="n">' + n + '</div>' + (extra || '') + '</div>';
+  }
+
+  function renderVerdict(v){
+    var el = document.getElementById("verdict");
+    el.className = "verdict " + (v.level === "hot" ? "hot" : (v.level === "mid" ? "mid" : ""));
+
+    document.getElementById("vlabel").textContent =
+      v.st.lunch ? "今日结论 · 午间半场"
+      : v.st.trading ? "今日结论 · 实时"
+      : v.st.after ? "今日收盘复盘"
+      : "最近交易日复盘 · " + fmtDate(S.trade_date);
+
+    var t = document.getElementById("vtitle");
+    t.textContent = v.title;
+    t.className = "vtitle " + (v.level === "cool" ? "cool" : "");
+    document.getElementById("vreason").textContent = v.reason;
+
+    var sn = document.getElementById("vstampNum");
+    sn.textContent = fmt(v.ratio, 2) + "×";
+    sn.className = "num" + (v.ratio >= CFG.hotRatio ? " hl" : "");
+    document.getElementById("vstampLabel").textContent =
+      (v.st.trading || v.st.lunch) ? "较同时点均值" : "较20日均额";
+
+    var pct = Math.min(100, v.ratio / 2.5 * 100);
+    var barHtml = '<div class="bar"><span style="width:' + pct.toFixed(1) + '%"></span></div>';
+    document.getElementById("mgrid").innerHTML =
+      card("池内合计成交额", fmt(v.amt,1) + " 亿",
+           (v.st.trading || v.st.lunch) ? "基准 " + fmt(v.base,1) + " 亿（同时点）" : "20日均额 " + fmt(v.base,1) + " 亿", "", "") +
+      card("成交额放大倍数", fmt(v.ratio,2) + "×",
+           "阈值 " + CFG.hotRatio.toFixed(1) + "× 为强信号", barHtml,
+           v.ratio >= CFG.hotRatio ? "hl" : "") +
+      card("合计主动净买入", signed(v.net,1) + " 亿", "逐笔方向推算，非资金流", "", cls(v.net)) +
+      card("池内加权涨跌", signed(v.wpct,2) + "%", "按规模加权", "", cls(v.wpct));
+  }
+
+  // ============================ 渲染：图表 ============================
+  function renderChart1(){
+    var box = document.getElementById("chart1");
+    var core = S.items.filter(function(x){ return x.group === "core"; });
+    var dates = [];
+    core.forEach(function(it){
+      (it.hist || []).forEach(function(h){
+        if (dates.indexOf(h.date) < 0) dates.push(h.date);
+      });
+    });
+    dates.sort();
+    dates = dates.slice(-30);
+    if (dates.length < 2) { box.innerHTML = '<div class="empty">数据积累中，需要至少 2 个交易日的快照</div>'; return; }
+
+    var series = dates.map(function(d){
+      var s = 0;
+      core.forEach(function(it){
+        (it.hist || []).forEach(function(h){ if (h.date === d) s += h.amt; });
+      });
+      return {d: d, v: s};
+    });
+    var baseSum = core.reduce(function(a, it){ return a + (it.avg20_yi || 0); }, 0);
+    var max = Math.max.apply(null, series.map(function(x){ return x.v; }).concat([baseSum]));
+    var W = 520, H = 150, pad = 4, bw = (W - pad*2) / series.length;
+
+    var bars = series.map(function(x, i){
+      var h = max > 0 ? (x.v / max) * (H - 26) : 0;
+      var isLast = i === series.length - 1;
+      return '<rect x="' + (pad + i*bw + bw*0.12).toFixed(1) + '" y="' + (H - 20 - h).toFixed(1)
+           + '" width="' + (bw*0.76).toFixed(1) + '" height="' + h.toFixed(1) + '" rx="1.5" fill="'
+           + (isLast ? "#e8590c" : "#c3cdda") + '"/>';
+    }).join("");
+
+    var by = H - 20 - (baseSum / max) * (H - 26);
+    var line = '<line x1="' + pad + '" y1="' + by.toFixed(1) + '" x2="' + (W-pad) + '" y2="' + by.toFixed(1)
+             + '" stroke="#3b5bdb" stroke-width="1" stroke-dasharray="4 3" opacity=".7"/>';
+    var lab = '<text x="' + (pad+2) + '" y="' + (by-5).toFixed(1) + '" font-size="9" fill="#3b5bdb">20日均额 '
+            + baseSum.toFixed(0) + '亿</text>'
+            + '<text x="' + pad + '" y="' + (H-4) + '" font-size="9" fill="#98a1ad">' + dates[0].slice(5) + '</text>'
+            + '<text x="' + (W-pad) + '" y="' + (H-4) + '" font-size="9" fill="#98a1ad" text-anchor="end">'
+            + dates[dates.length-1].slice(5) + '</text>';
+
+    box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '">'
+                  + bars + line + lab + '</svg>';
+  }
+
+  function renderChart2(){
+    var box = document.getElementById("chart2");
+    var hist = S.shares_history || {};
+    var dates = Object.keys(hist).sort();
+    if (dates.length < 2) {
+      box.innerHTML = '<div class="empty">份额历史只有 1 天，指数从第 2 天开始有意义<br>'
+                    + '累计运行 ' + dates.length + ' 天后自动出现</div>';
+      return;
+    }
+    var codes = S.items.filter(function(x){ return x.group === "core"; }).map(function(x){ return x.code; });
+    function total(d){ var s = 0; codes.forEach(function(c){ s += (hist[d][c] || 0); }); return s; }
+    var t0 = total(dates[0]);
+    var pts = dates.map(function(d){ return {d: d, v: t0 > 0 ? 100 * total(d) / t0 : 100}; });
+
+    var lo = Math.min.apply(null, pts.map(function(p){ return p.v; }));
+    var hi = Math.max.apply(null, pts.map(function(p){ return p.v; }));
+    var min = Math.min(lo, 99) * 0.995, max = Math.max(hi, 101) * 1.005;
+    var W = 520, H = 150, padL = 6, padR = 6;
+    function X(i){ return padL + (W - padL - padR) * (pts.length === 1 ? 0.5 : i / (pts.length - 1)); }
+    function Y(v){ return H - 20 - (v - min) / (max - min) * (H - 34); }
+
+    var path = pts.map(function(p, i){ return (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(p.v).toFixed(1); }).join(" ");
+    var area = path + " L" + X(pts.length-1).toFixed(1) + " " + (H-20) + " L" + X(0).toFixed(1) + " " + (H-20) + " Z";
+    var y100 = Y(100);
+    var lastP = pts[pts.length-1];
+
+    box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '">'
+      + '<line x1="0" y1="' + y100.toFixed(1) + '" x2="' + W + '" y2="' + y100.toFixed(1)
+      + '" stroke="#c3cdda" stroke-width="1" stroke-dasharray="4 3"/>'
+      + '<text x="' + (W-2) + '" y="' + (y100-5).toFixed(1) + '" font-size="9" fill="#98a1ad" text-anchor="end">100 = 起点</text>'
+      + '<path d="' + area + '" fill="' + (lastP.v >= 100 ? "#d9363e" : "#12805c") + '" opacity=".07"/>'
+      + '<path d="' + path + '" fill="none" stroke="' + (lastP.v >= 100 ? "#d9363e" : "#12805c")
+      + '" stroke-width="1.8" stroke-linejoin="round"/>'
+      + '<circle cx="' + X(pts.length-1).toFixed(1) + '" cy="' + Y(lastP.v).toFixed(1) + '" r="3" fill="'
+      + (lastP.v >= 100 ? "#d9363e" : "#12805c") + '"/>'
+      + '<text x="' + padL + '" y="' + (H-4) + '" font-size="9" fill="#98a1ad">' + dates[0].slice(4,6) + '/'
+      + dates[0].slice(6,8) + '</text>'
+      + '<text x="' + (W-padR) + '" y="' + (H-4) + '" font-size="9" fill="#98a1ad" text-anchor="end">'
+      + dates[dates.length-1].slice(4,6) + '/' + dates[dates.length-1].slice(6,8) + '</text>'
+      + '<text x="' + (X(pts.length-1)).toFixed(1) + '" y="' + (Y(lastP.v)-8).toFixed(1)
+      + '" font-size="10" font-weight="700" fill="' + (lastP.v >= 100 ? "#d9363e" : "#12805c")
+      + '" text-anchor="end">' + lastP.v.toFixed(1) + '</text>'
+      + '</svg>';
+  }
+
+  // ============================ 渲染：表格 ============================
+  function spark(hist){
+    if (!hist || !hist.length) return '<span class="muted">—</span>';
+    var vals = hist.slice(-30).map(function(h){ return h.amt; });
+    var max = Math.max.apply(null, vals) || 1;
+    return '<div class="spark">' + vals.map(function(v, i){
+      var h = Math.max(2, (v / max) * 22);
+      return '<i class="' + (i === vals.length-1 ? "last" : "") + '" style="height:' + h.toFixed(1) + 'px"></i>';
+    }).join("") + '</div>';
+  }
+
+  function shareCell(it){
+    var v = it.subscr_net_yi;
+    var hist = S.shares_history || {};
+    var keys = Object.keys(hist).sort();
+    var cur = keys.length ? keys[keys.length-1] : "";
+    var prv = keys.length > 1 ? keys[keys.length-2] : "";
+    if (!cur || !prv || !hist[prv][it.code] || !hist[cur][it.code]) {
+      return '<div class="sub muted">待积累</div>';
+    }
+    var d = hist[cur][it.code] - hist[prv][it.code];
+    // 自检：同一市场 ≥70% 标的两日份额完全相同 → 判定为数据源未更新，不给数字
+    var mkt = it.code.slice(0,1) === "5" ? "sh" : "sz";
+    var peers = S.items.filter(function(x){ return (x.code.slice(0,1) === "5") === (mkt === "sh"); });
+    var known = 0, same = 0;
+    peers.forEach(function(x){
+      if (hist[cur][x.code] == null || hist[prv][x.code] == null) return;
+      known++;
+      if (Math.abs(hist[cur][x.code] - hist[prv][x.code]) < 0.005) same++;
+    });
+    if (known >= 3 && same / known >= 0.7) {
+      return '<div class="sub muted" title="同市场绝大多数标的份额两日完全相同，判断为数据源未按日更新">份额源未日更</div>';
+    }
+    if (Math.abs(d) < 0.005) return '<div class="sub muted">较' + prv.slice(4,6) + '-' + prv.slice(6,8) + ' 持平</div>';
+    return '<div class="sub num ' + cls(d) + '">较' + prv.slice(4,6) + '-' + prv.slice(6,8) + ' '
+         + signed(d,2) + '亿份</div>';
+  }
+
+  function renderTable(){
+    var st = marketState();
+    var list = S.items.slice();
+    list.sort(function(a, b){
+      if (a.group !== b.group) return a.group === "core" ? -1 : 1;
+      return (b.mktcap_yi || 0) - (a.mktcap_yi || 0);
+    });
+
+    var html = "", lastGroup = "";
+    list.forEach(function(it){
+      if (it.group !== lastGroup) {
+        lastGroup = it.group;
+        var cnt = list.filter(function(x){ return x.group === it.group; }).length;
+        html += '<tr class="grouphead"><td colspan="10">'
+             + (it.group === "core" ? "核心池 · 2025年报有汇金持仓记录（历史标签，非当前持仓）" : "对照池 · 仅作参照，不计入结论")
+             + '<span class="cnt">' + cnt + ' 只</span></td></tr>';
+      }
+      var c = calc(it, st);
+      var rCls = c.ratio >= CFG.hotRatio ? "hl" : (c.ratio >= CFG.midRatio ? "" : "muted");
+      var hb = Math.min(100, c.ratio / 3 * 100);
+      var liveTag = c.isLive ? '<div class="sub muted">实时</div>' : '';
+      html += '<tr>'
+        + '<td><div class="name">' + it.name + '<span class="chip ' + it.group + '">'
+          + (it.group === "core" ? "核心" : "对照") + '</span></div>'
+          + '<div class="code num">' + it.code + '</div></td>'
+        + '<td class="muted">' + it.index + '</td>'
+        + '<td class="r num">' + fmt(it.mktcap_yi, 1) + '</td>'
+        + '<td class="r num" style="font-weight:700">' + fmt(c.amt, 2) + liveTag + '</td>'
+        + '<td class="r"><div class="num ' + rCls + '" style="font-weight:700">' + fmt(c.ratio, 2) + '×</div>'
+          + '<div class="mini"><span class="' + (c.ratio >= CFG.hotRatio ? "hi" : "") + '" style="width:'
+          + hb.toFixed(1) + '%"></span></div></td>'
+        + '<td class="r num ' + cls(c.net) + '" style="font-weight:700">' + signed(c.net, 2) + '</td>'
+        + '<td class="r num ' + cls(c.pct) + '">' + signed(c.pct, 2) + '%</td>'
+        + '<td class="r"><div class="num">' + fmt(it.shares_yi, 1) + '</div>' + shareCell(it) + '</td>'
+        + '<td>' + spark(it.hist) + '</td>'
+        + '<td class="r num ' + (it.huijin_yi ? "" : "muted") + '">'
+          + (it.huijin_yi ? fmt(it.huijin_yi, 1) : "—") + '</td>'
+        + '</tr>';
+    });
+
+    var core = S.items.filter(function(x){ return x.group === "core"; });
+    var sa = 0, sb = 0, sn = 0, snCnt = 0;
+    core.forEach(function(it){
+      var c = calc(it, st);
+      sa += c.amt; sb += (it.avg20_yi || 0) * c.done;
+      if (c.net !== null) { sn += c.net; snCnt++; }
+    });
+    html += '<tr class="total"><td>合计 · 核心池</td><td class="muted">' + core.length + ' 只</td>'
+      + '<td class="r muted">—</td><td class="r num">' + fmt(sa, 2) + '</td>'
+      + '<td class="r num hl">' + fmt(sb > 0 ? sa/sb : 0, 2) + '×</td>'
+      + '<td class="r num ' + cls(sn) + '">' + (snCnt ? signed(sn, 2) : "—") + '</td>'
+      + '<td colspan="4" class="muted" style="text-align:right">与上方结论同一口径</td></tr>';
+
+    document.getElementById("tbody").innerHTML = html;
+  }
+
+  // ============================ 渲染：状态栏 ============================
+  function renderStatus(){
+    var st = marketState();
+    var badge = document.getElementById("badge"), txt = document.getElementById("badgeText");
+    if (st.lunch) {
+      badge.className = "badge"; txt.textContent = "午间休市 · 锁 11:30";
+    } else if (st.trading) {
+      badge.className = "badge" + (liveOK ? " live" : " warn");
+      txt.textContent = liveOK ? "实时 · 每20秒" : "实时通道不可用 · 显示快照";
+    } else if (st.preopen) {
+      badge.className = "badge"; txt.textContent = "等待开盘 9:30";
+    } else if (st.after) {
+      badge.className = "badge" + (liveOK ? " live" : " warn");
+      txt.textContent = "已收盘 · 今日复盘";
+    } else {
+      badge.className = "badge"; txt.textContent = "休市 · 最近交易日";
+    }
+
+    var items = S.items || [];
+    var ts = items.length && items[0].ts ? items[0].ts : "";
+    var tsTxt = ts.length >= 14
+      ? ts.slice(0,4) + "-" + ts.slice(4,6) + "-" + ts.slice(6,8) + " " + ts.slice(8,10) + ":" + ts.slice(10,12)
+      : "—";
+    var stale = S.trade_date && st.date > S.trade_date && (st.trading || st.after);
+    document.getElementById("meta").innerHTML =
+      "快照 " + fmtDate(S.trade_date) + " · 生成 " + (S.generated_at || "—") + " · 行情时间 " + tsTxt
+      + (liveOK ? " · 实时已连接" : "")
+      + (stale ? ' <span style="color:#e8590c">· 快照非今日，建议收盘后跑 update_data.py</span>' : "");
+  }
+
+  function renderAll(){
+    var v = verdict();
+    renderVerdict(v);
+    renderChart1();
+    renderChart2();
+    renderTable();
+    renderStatus();
+  }
+
+  // ============================ 实时通道（JSONP） ============================
+  function fetchLive(){
+    if (refreshing || !S) return;
+    refreshing = true;
+    var btn = document.getElementById("refresh");
+    btn.textContent = "更新中…";
+    var codes = S.items.map(function(x){ return x.tcode; });
+    var url = "https://qt.gtimg.cn/q=" + codes.join(",") + "&r=" + Date.now();
+    var s = document.createElement("script");
+    s.src = url;
+    s.async = true;
+    var done = false;
+
+    function finish(ok){
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (ok && applyLive() > 0) { liveOK = true; } else { liveOK = false; }
+      refreshing = false;
+      btn.textContent = "立即刷新";
+      renderAll();
+      try { s.parentNode && s.parentNode.removeChild(s); } catch(e){}
+    }
+    var timer = setTimeout(function(){ finish(false); }, 7000);
+    s.onload = function(){ finish(true); };
+    s.onerror = function(){ finish(false); };
+    document.head.appendChild(s);
+  }
+
+  function applyLive(){
+    var got = 0;
+    S.items.forEach(function(it){
+      var raw = window["v_" + it.tcode];
+      if (!raw) return;
+      var a = String(raw).split("~");
+      if (a.length < 46) return;
+      function n(i){ var v = parseFloat(a[i]); return isNaN(v) ? 0 : v; }
+      LIVE[it.code] = {
+        price: n(3),
+        pct: n(32),
+        amount: n(37) / 1e4,      // 万元 → 亿元
+        outer: n(7),
+        inner: n(8),
+        mktcap: n(45),
+        shares: n(72),
+        ts: a[30] || ""
+      };
+      got++;
+      // 顺手用实时份额修正当前快照的份额展示
+      if (LIVE[it.code].shares > 0) {
+        it.shares_yi = LIVE[it.code].shares / 1e8;
+        it.shares = LIVE[it.code].shares;
+      }
+    });
+    return got;
+  }
+
+  // ============================ 调度 ============================
+  function schedule(){
+    clearTimeout(window.__t);
+    var st = marketState();
+    var ms = st.trading ? CFG.liveRefreshMs : CFG.idleRefreshMs;
+    window.__t = setTimeout(function(){
+      if (document.getElementById("auto").checked && marketState().trading) fetchLive();
+      schedule();
+    }, ms);
+  }
+
+  function boot(snap){
+    S = snap;
+    S.items.forEach(function(it){ if (it.subscr_net_yi === undefined) it.subscr_net_yi = null; });
+    document.getElementById("refresh").addEventListener("click", fetchLive);
+    renderAll();
+    if (marketState().trading) fetchLive();
+    schedule();
+  }
+
+  // ============================ 启动：加载快照 ============================
+  (function load(){
+    var s = document.createElement("script");
+    s.src = "data/snapshot.js?t=" + Date.now();
+    s.onload = function(){
+      if (window.SNAPSHOT) boot(window.SNAPSHOT);
+      else document.getElementById("vtitle").textContent = "快照文件为空，请先跑 update_data.py";
+    };
+    s.onerror = function(){
+      document.getElementById("vtitle").textContent = "找不到 data/snapshot.js";
+      document.getElementById("vreason").textContent = "请先在项目目录运行 python update_data.py 生成快照，然后用浏览器打开本页。";
+    };
+    document.head.appendChild(s);
+  })();
+
+})();
+</script>
+</body>
+</html>

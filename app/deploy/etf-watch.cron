@@ -1,0 +1,23 @@
+# 宽基ETF量价跟踪器 · 定时任务
+# 部署位置: /etc/cron.d/etf-watch   (权限必须是 644,文件名不能带点)
+# 生效:     systemctl restart cron ; 查验: cat /etc/cron.d/etf-watch
+#
+# 为什么是两次:
+#   09:45 —— 只为补沪市份额。腾讯接口里沪市 ETF 的份额是 T+1 的,
+#            收盘时抓到的其实是昨天值。不补这次,510300/510050 份额变化永远是 0。
+#   15:35 —— 主任务。外盘/内盘只在"当天"有效,第二天字段翻篇,
+#            当日的主动净买入永久丢失,没有任何补救手段。
+#
+# 为什么 15:35 而不是 15:05:
+#   收盘后行情商落库有几分钟延迟,15:10 偶尔会拿到残缺值。30 分钟缓冲最稳。
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+TZ=Asia/Shanghai
+
+# 分钟 小时 日 月 周  用户  命令
+45 9  * * 1-5  root  flock -n /tmp/etf-watch.lock /opt/etf-watch/deploy/run_once.sh 09:45
+35 15 * * 1-5  root  flock -n /tmp/etf-watch.lock /opt/etf-watch/deploy/run_once.sh 15:35
+
+# 可选:每天 16:10 备份 data/ 到 OSS(取消注释前先填好 deploy/backup.sh 里的参数)
+# 10 16 * * 1-5  root  /opt/etf-watch/deploy/backup.sh
